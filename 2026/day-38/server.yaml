@@ -1,0 +1,11 @@
+server:
+  name: "testing-server"
+  ip: 192.168.1.0
+  port: 80
+
+database:
+  host: "DB_HOST"
+  name: "test_db"
+  credentials: 
+    user: "demo-user"
+    password: "test@123"
