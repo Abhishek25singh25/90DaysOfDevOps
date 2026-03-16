@@ -1,0 +1,43 @@
+name: Docker Publish
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  docker-push:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      - name: Build Docker Image
+        run: docker build -t my-app:v1 -f .github/workflows/Dockerfile .
+
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Check username
+        run: echo "Docker user is ${{ secrets.DOCKER_USERNAME }}"
+
+
+      - name: Tag Docker image (latest)
+        run: docker tag my-app:v1 ${{ secrets.DOCKER_USERNAME }}/myapp:latest
+
+
+      - name: Tag Docker image (commit SHA)
+        run: docker tag my-app:v1 ${{ secrets.DOCKER_USERNAME }}/myapp:sha-${{ github.sha }}
+
+
+      - name: Push Docker Images
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/myapp:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/myapp:sha-${{ github.sha }}
