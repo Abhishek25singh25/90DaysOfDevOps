@@ -1,23 +1,29 @@
-# Day 48 – GitHub Actions Capstone (End-to-End CI/CD)
+# Day 48 – GitHub Actions Capstone (CI/CD Pipeline)
 
 ---
 
 # 🎯 Objective
 
-Build a complete CI/CD pipeline using GitHub Actions that:
+The goal of this project is to build a complete CI/CD pipeline using GitHub Actions.
 
-* Builds and tests the application
-* Creates and pushes Docker images
-* Simulates deployment
-* Performs scheduled health checks
+The pipeline performs:
+
+* Build the application
+* Run tests
+* Build and push Docker image
+* Simulate deployment
+* Perform scheduled health checks
 
 ---
 
 # 🧩 Task 1: Project Setup
 
-## 📌 Application
+## 📌 What was built?
 
-We created a **portfolio-based Flask application** that serves a frontend UI and exposes a health endpoint.
+A simple **Flask-based portfolio application**:
+
+* `/` → serves the frontend (HTML page)
+* `/health` → returns application status
 
 ---
 
@@ -47,63 +53,8 @@ if __name__ == "__main__":
 ### index.html
 
 ```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Abhishek | Portfolio</title>
-
-<style>
-* { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI'; }
-body { background:linear-gradient(135deg,#0f172a,#020617); color:white; }
-
-nav { display:flex; justify-content:space-between; padding:20px 50px; }
-nav h2 { color:#22c55e; }
-
-.hero { text-align:center; padding:100px 20px; }
-.hero span { color:#22c55e; }
-
-section { padding:60px 50px; }
-
-.card { background:#1e293b; padding:20px; border-radius:10px; }
-
-footer { text-align:center; padding:20px; }
-
-button { background:#22c55e; border:none; padding:10px 20px; color:white; }
-</style>
-</head>
-
-<body>
-
-<nav>
-  <h2>Abhishek</h2>
-</nav>
-
-<div class="hero">
-  <h1>Hi, I'm <span>Abhishek</span> 👋</h1>
-  <p>DevOps | Java | Python | CI/CD Enthusiast</p>
-</div>
-
-<section>
-  <h2>Projects</h2>
-  <div class="card">CI/CD Pipeline using GitHub Actions</div>
-</section>
-
-<footer>
-  <p>© 2026 Abhishek</p>
-</footer>
-
-</body>
-</html>
-```
-
----
-
-### requirements.txt
-
-```
-flask
+<h1>Hi, I'm Abhishek 🚀</h1>
+<p>DevOps | Java | Python | CI/CD Enthusiast</p>
 ```
 
 ---
@@ -127,12 +78,8 @@ fi
 FROM python:3.11-slim
 
 WORKDIR /app
-
 COPY . .
-
 RUN pip install -r requirements.txt
-
-EXPOSE 5000
 
 CMD ["python", "app.py"]
 ```
@@ -141,195 +88,219 @@ CMD ["python", "app.py"]
 
 ## 🧠 Explanation
 
-* Flask serves the portfolio website
+* Flask serves the HTML portfolio page
 * `/health` endpoint is used for monitoring
-* Dockerfile containerizes the application
+* Dockerfile makes the app portable
+
+👉 This forms the base of the CI/CD pipeline.
 
 ---
 
-# 🔁 Task 2: Reusable Build & Test
+# 🔁 Task 2: Reusable Workflow – Build & Test
 
 ## 📌 Purpose
 
-To install dependencies and run tests in a reusable workflow.
+To create a reusable workflow that:
+
+* Installs dependencies
+* Runs tests
+* Returns result (`passed` or `failed`)
+
+---
 
 ## 📁 Code
 
 ```yaml
-name: Build and Test
-
 on:
   workflow_call:
-    inputs:
-      python_version:
-        type: string
-      run_tests:
-        type: boolean
-    outputs:
-      test_result:
-        value: ${{ jobs.build.outputs.result }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    outputs:
-      result: ${{ steps.set.outputs.value }}
-
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ inputs.python_version }}
 
       - run: pip install -r requirements.txt
+
       - id: test
         run: bash test.sh || true
-
-      - id: set
-        run: |
-          if [ "${{ steps.test.outcome }}" = "success" ]; then
-            echo "value=passed" >> $GITHUB_OUTPUT
-          else
-            echo "value=failed" >> $GITHUB_OUTPUT
-          fi
 ```
+
+---
+
+## 🧠 Explanation
+
+* `workflow_call` makes the workflow reusable
+* `|| true` prevents pipeline from stopping immediately
+* Test result is handled manually
+
+👉 This is the **CI (Continuous Integration)** part.
 
 ---
 
 # 🐳 Task 3: Docker Build & Push
 
+## 📌 Purpose
+
+To:
+
+* Build Docker image
+* Push it to Docker Hub
+
+---
+
 ## 📁 Code
 
 ```yaml
-name: Docker Build and Push
+- uses: docker/login-action@v3
 
-on:
-  workflow_call:
-    inputs:
-      image_name:
-        type: string
-      tag:
-        type: string
-    secrets:
-      docker_username:
-        required: true
-      docker_token:
-        required: true
-
-jobs:
-  docker:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.docker_username }}
-          password: ${{ secrets.docker_token }}
-
-      - uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ secrets.docker_username }}/${{ inputs.image_name }}:${{ inputs.tag }}
+- uses: docker/build-push-action@v5
 ```
+
+---
+
+## 🧠 Explanation
+
+* Docker containerizes the application
+* Ensures consistency across environments
+
+👉 This is part of **CD (Continuous Delivery)**.
 
 ---
 
 # 🔍 Task 4: PR Pipeline
 
-```yaml
-name: PR Checks
+## 📌 Purpose
 
+To run tests when a Pull Request is created.
+
+---
+
+## 📁 Code
+
+```yaml
 on:
   pull_request:
-    branches: [main]
 
 jobs:
   test:
-    uses: ./.github/workflows/reusable-build-test.yml
-    with:
-      python_version: "3.11"
-      run_tests: true
+    uses: reusable-build-test.yml
 ```
 
-👉 Only tests run (no Docker)
+---
+
+## 🧠 Explanation
+
+* Only tests are executed
+* No Docker build or deployment
+
+👉 Prevents broken code from being merged.
 
 ---
 
 # 🚀 Task 5: Main Pipeline
 
+## 📌 Flow
+
+1. Run tests
+2. Build Docker image
+3. Push Docker image
+4. Deploy
+
+---
+
+## 📁 Code
+
 ```yaml
-name: Main Pipeline
-
-on:
-  push:
-    branches: [main]
-
 jobs:
   test:
-    uses: ./.github/workflows/reusable-build-test.yml
-    with:
-      python_version: "3.11"
-      run_tests: true
+    uses: reusable-build-test.yml
 
   docker:
     needs: test
-    if: needs.test.outputs.test_result == 'passed'
-    uses: ./.github/workflows/reusable-docker-build-push.yml
-    with:
-      image_name: "my-app"
-      tag: "latest"
-    secrets: inherit
-
-  deploy:
-    needs: docker
-    runs-on: ubuntu-latest
-
-    steps:
-      - run: echo "Deploying image..."
 ```
+
+---
+
+## 🧠 Explanation
+
+* `needs` ensures sequential execution
+* Docker runs only if tests pass
+
+👉 This represents a real CI/CD pipeline.
 
 ---
 
 # ⏰ Task 6: Health Check
 
-```yaml
-name: Health Check
+## 📌 Purpose
 
+To monitor the application automatically.
+
+---
+
+## 📁 Code
+
+```yaml
 on:
   schedule:
     - cron: '0 */12 * * *'
 
-jobs:
-  check:
-    runs-on: ubuntu-latest
-
-    steps:
-      - run: docker run -d -p 5000:5000 my-app:latest
-      - run: sleep 5
-      - run: curl http://localhost:5000/health
+steps:
+  - run: curl http://localhost:5000/health
 ```
+
+---
+
+## 🧠 Explanation
+
+* Runs every 12 hours
+* Checks application health
+
+👉 Important for production monitoring.
 
 ---
 
 # 🧠 Task 7: Pipeline Architecture
 
+## 📌 Flow Diagram
+
 ```
-PR → Build & Test
+Pull Request → Build & Test
 
-Main → Test → Docker → Deploy
+Merge to Main → Build & Test → Docker Build → Deploy
 
-Schedule → Health Check
+Scheduled → Health Check
 ```
 
 ---
 
-# 📌 Conclusion
+## 🧠 Explanation
 
-This project demonstrates a real-world CI/CD pipeline using GitHub Actions with Docker and monitoring.
+* PR pipeline → validation
+* Main pipeline → full CI/CD
+* Health check → monitoring
+
+👉 This represents the complete DevOps lifecycle.
+
+---
+
+# 📌 Final Understanding
+
+This project covers:
+
+* Continuous Integration (CI)
+* Continuous Delivery (CD)
+* Docker containerization
+* GitHub Actions automation
+* Application monitoring
+
+---
+
+# 🔥 Conclusion
+
+This project demonstrates how to build a production-style CI/CD pipeline using GitHub Actions, including testing, deployment, and monitoring.
 
 ---
 
